@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename         # ← Add this line
+from werkzeug.utils import secure_filename
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
 from email_validator import validate_email, EmailNotValidError
@@ -13,13 +13,16 @@ from docx import Document
 import nbformat
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key'  # ← Change this to a random secret in production
+app.secret_key = 'your_super_secret_key'
 
-# ----- Database Setup -----
+# Admin credentials
+ADMIN_USERNAME = 'admin'
+ADMIN_PASSWORD = 'ahmedkhan0300'
+
+# Database setup
 DB_NAME = 'users.db'
 
 def init_db():
-    """Initialize SQLite database and create 'users' table if it doesn't exist."""
     with sqlite3.connect(DB_NAME) as conn:
         c = conn.cursor()
         c.execute('''
@@ -34,20 +37,18 @@ def init_db():
 
 init_db()
 
-
-# ----- Flask-Mail Config (for Password Reset) -----
+# Flask-Mail Config
 app.config.update(
-    MAIL_SERVER='smtp.gmail.com',       # e.g., Gmail SMTP
+    MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
-    MAIL_USERNAME='your_email@gmail.com',      # ← Replace with your email
-    MAIL_PASSWORD='your_app_password'          # ← Replace with your email's app-password
+    MAIL_USERNAME='your_email@gmail.com',
+    MAIL_PASSWORD='your_app_password'
 )
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
-
-# ----- Helper Functions for User CRUD -----
+# User helper functions
 def get_user_by_email(email):
     with sqlite3.connect(DB_NAME) as conn:
         c = conn.cursor()
@@ -73,8 +74,7 @@ def update_password(email, new_password_hash):
         c.execute("UPDATE users SET password = ? WHERE email = ?", (new_password_hash, email))
         conn.commit()
 
-
-# ----- File Conversion Folders -----
+# File paths
 UPLOAD_FOLDER = 'uploads'
 CONVERTED_FOLDER = 'converted'
 TEMP_FOLDER = 'converter_temp'
@@ -82,35 +82,29 @@ for folder in (UPLOAD_FOLDER, CONVERTED_FOLDER, TEMP_FOLDER):
     os.makedirs(folder, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {'pdf'}
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
-# ====== Routes: Authentication ======
-
+# Routes
 @app.route('/')
 def home():
-    """Home page: if logged in, redirect to dashboard, else show generic home."""
     if session.get('username'):
         return redirect(url_for('dashboard'))
     return render_template('home.html')
 
-
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    """User registration. Validate input, hash password, save to SQLite."""
     if request.method == 'POST':
         username = request.form['username'].strip()
         email = request.form['email'].strip()
         password = request.form['password']
         confirm = request.form['confirm_password']
 
-        # Basic server-side validation
         if not username or not email or not password or not confirm:
             flash('All fields are required.', 'error')
             return redirect(url_for('signup'))
 
-        # Validate email format
         try:
             valid = validate_email(email)
             email = valid.email
@@ -118,12 +112,10 @@ def signup():
             flash(str(e), 'error')
             return redirect(url_for('signup'))
 
-        # Check password match
         if password != confirm:
             flash('Passwords do not match.', 'error')
             return redirect(url_for('signup'))
 
-        # Check username/email uniqueness
         if get_user_by_username(username):
             flash('Username already exists.', 'error')
             return redirect(url_for('signup'))
@@ -131,7 +123,6 @@ def signup():
             flash('Email already registered.', 'error')
             return redirect(url_for('signup'))
 
-        # Hash password and insert new user
         hashed = generate_password_hash(password)
         create_user(username, email, hashed)
         flash('Registration successful. Please log in.', 'success')
@@ -139,17 +130,14 @@ def signup():
 
     return render_template('signup.html')
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """User login. Accept either email or username as identifier."""
     if request.method == 'POST':
         identifier = request.form['email_or_username'].strip()
         password = request.form['password']
-
         user = get_user_by_email(identifier) or get_user_by_username(identifier)
         if user and check_password_hash(user[3], password):
-            session['username'] = user[1]  # store username in session
+            session['username'] = user[1]
             flash('Welcome, ' + user[1] + '!', 'success')
             return redirect(url_for('dashboard'))
 
@@ -158,22 +146,14 @@ def login():
 
     return render_template('login.html')
 
-
 @app.route('/logout')
 def logout():
-    """Log out the user by clearing session."""
     session.pop('username', None)
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
 
-
 @app.route('/reset_password', methods=['GET', 'POST'])
 def reset_request():
-    """
-    Step 1 of password reset:
-    - GET: show form to enter email
-    - POST: if user exists, send an email with a time-limited token link
-    """
     if request.method == 'POST':
         email = request.form['email'].strip()
         user = get_user_by_email(email)
@@ -183,7 +163,7 @@ def reset_request():
             msg = Message('Password Reset Request',
                           sender='your_email@gmail.com',
                           recipients=[email])
-            msg.body = f'Click the link below to reset your password (valid for 1 hour):\n{link}\n\nIf you did not request this, please ignore.'
+            msg.body = f'Click the link to reset your password: {link}'
             mail.send(msg)
             flash('Reset link sent to your email.', 'success')
         else:
@@ -192,15 +172,8 @@ def reset_request():
 
     return render_template('reset_request.html')
 
-
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_token(token):
-    """
-    Step 2 of password reset:
-    - Validate token <=> email, expires in 3600s
-    - GET: show form to enter new password
-    - POST: update the user's password in DB
-    """
     try:
         email = serializer.loads(token, salt='reset-salt', max_age=3600)
     except Exception:
@@ -216,133 +189,117 @@ def reset_token(token):
 
         hashed = generate_password_hash(password)
         update_password(email, hashed)
-        flash('Password updated successfully. You can log in now.', 'success')
+        flash('Password updated successfully.', 'success')
         return redirect(url_for('login'))
 
     return render_template('reset_token.html')
 
-
-# ====== Routes: PDF Converter (Protected) ======
-
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
-    """Main converter page. User must be logged in to see and use."""
     if not session.get('username'):
         flash('Please log in to access the converter.', 'error')
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        # 1. Validate file upload
         if 'file' not in request.files:
             flash('No file part.', 'error')
             return redirect(url_for('dashboard'))
         file = request.files['file']
         if file.filename == '' or not allowed_file(file.filename):
-            flash('Please upload a valid PDF file.', 'error')
+            flash('Invalid file.', 'error')
             return redirect(url_for('dashboard'))
 
-        # 2. Save uploaded PDF
         filename = secure_filename(file.filename)
         unique_id = str(uuid.uuid4())
         upload_path = os.path.join(UPLOAD_FOLDER, f"{unique_id}_{filename}")
         file.save(upload_path)
 
-        # 3. Determine requested conversion
         conv_type = request.form.get('conversion_type')
         try:
             if conv_type == 'pdf_to_word':
-                output_path = pdf_to_word(upload_path, unique_id)
-                return send_file(output_path, as_attachment=True)
-
+                return send_file(pdf_to_word(upload_path, unique_id), as_attachment=True)
             elif conv_type == 'pdf_to_jpg':
-                zip_path = pdf_to_jpg_zip(upload_path, unique_id)
-                return send_file(zip_path, as_attachment=True)
-
+                return send_file(pdf_to_jpg_zip(upload_path, unique_id), as_attachment=True)
             elif conv_type == 'pdf_to_ipynb':
-                ipynb_path = pdf_to_ipynb(upload_path, unique_id)
-                return send_file(ipynb_path, as_attachment=True)
-
+                return send_file(pdf_to_ipynb(upload_path, unique_id), as_attachment=True)
             else:
-                flash('Invalid conversion type selected.', 'error')
-                return redirect(url_for('dashboard'))
-
+                flash('Invalid conversion type.', 'error')
         except Exception as e:
             flash(f'Conversion failed: {str(e)}', 'error')
-            return redirect(url_for('dashboard'))
 
-    # GET request: just render the dashboard form
     return render_template('dashboard.html', username=session.get('username'))
 
+# Admin Routes
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password']
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['admin'] = True
+            flash('Welcome, Admin!', 'success')
+            return redirect(url_for('admin_dashboard'))
+        flash('Invalid admin credentials.', 'error')
+    return render_template('admin_login.html')
 
-# ----- Converter Helper Functions -----
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    if not session.get('admin'):
+        flash('Admin access required.', 'error')
+        return redirect(url_for('admin_login'))
 
+    with sqlite3.connect(DB_NAME) as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, username, email FROM users")
+        users = c.fetchall()
+
+    return render_template('admin_dashboard.html', users=users)
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin', None)
+    flash('Admin logged out.', 'success')
+    return redirect(url_for('admin_login'))
+
+# PDF Conversion Functions
 def pdf_to_word(pdf_path, unique_id):
-    """Extract all PDF text and write it into a .docx file."""
     doc = Document()
     doc.add_heading('Converted from PDF', level=1)
     pdf = fitz.open(pdf_path)
     for page in pdf:
-        text = page.get_text()
-        doc.add_paragraph(text)
-
-    output_filename = f"{unique_id}_converted.docx"
-    output_path = os.path.join(CONVERTED_FOLDER, output_filename)
+        doc.add_paragraph(page.get_text())
+    output_path = os.path.join(CONVERTED_FOLDER, f"{unique_id}_converted.docx")
     doc.save(output_path)
     return output_path
 
-
 def pdf_to_jpg_zip(pdf_path, unique_id):
-    """
-    Render every PDF page as a JPG, then zip all images into one .zip file.
-    """
     pdf = fitz.open(pdf_path)
     image_folder = os.path.join(TEMP_FOLDER, unique_id)
     os.makedirs(image_folder, exist_ok=True)
-
     image_paths = []
-    for page_index in range(len(pdf)):
-        page = pdf[page_index]
+    for i, page in enumerate(pdf):
         pix = page.get_pixmap(dpi=150)
-        img_filename = f"page_{page_index + 1}.jpg"
-        img_path = os.path.join(image_folder, img_filename)
+        img_path = os.path.join(image_folder, f"page_{i+1}.jpg")
         pix.save(img_path)
         image_paths.append(img_path)
-
-    zip_filename = f"{unique_id}_pages.zip"
-    zip_path = os.path.join(CONVERTED_FOLDER, zip_filename)
-    with zipfile.ZipFile(zip_path, 'w') as zf:
-        for img_path in image_paths:
-            zf.write(img_path, arcname=os.path.basename(img_path))
-
-    # Cleanup intermediate JPGs
-    for img_path in image_paths:
-        os.remove(img_path)
+    zip_path = os.path.join(CONVERTED_FOLDER, f"{unique_id}_pages.zip")
+    with zipfile.ZipFile(zip_path, 'w') as z:
+        for img in image_paths:
+            z.write(img, arcname=os.path.basename(img))
+    for img in image_paths:
+        os.remove(img)
     os.rmdir(image_folder)
-
     return zip_path
 
-
 def pdf_to_ipynb(pdf_path, unique_id):
-    """
-    Extract PDF text and write it into a simple Jupyter Notebook (.ipynb),
-    with one Markdown cell containing all the text.
-    """
     pdf = fitz.open(pdf_path)
-    full_text = ""
-    for page in pdf:
-        full_text += page.get_text() + "\n\n"
-
+    full_text = "\n\n".join([page.get_text() for page in pdf])
     nb = nbformat.v4.new_notebook()
-    cell = nbformat.v4.new_markdown_cell(f"# Text extracted from PDF\n\n```\n{full_text}\n```")
-    nb['cells'] = [cell]
-
-    output_filename = f"{unique_id}_converted.ipynb"
-    output_path = os.path.join(CONVERTED_FOLDER, output_filename)
+    nb.cells = [nbformat.v4.new_markdown_cell(f"# Extracted from PDF\n\n```\n{full_text}\n```")]
+    output_path = os.path.join(CONVERTED_FOLDER, f"{unique_id}_converted.ipynb")
     with open(output_path, 'w', encoding='utf-8') as f:
         nbformat.write(nb, f)
-
     return output_path
-
 
 if __name__ == '__main__':
     app.run(debug=True)
