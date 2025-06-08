@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  <h2 class="mb-4 text-center">Welcome, {{ username }}! Use the converter below:</h2>
+  <form method="POST" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" onsubmit="return validateForm()">
+    <div class="mb-3">
+      <label for="file" class="form-label">Select PDF File</label>
+      <input type="file" name="file" id="file" class="form-control" accept=".pdf" required />
+    </div>
+    <div class="mb-3">
+      <label for="conversion_type" class="form-label">Conversion Type</label>
+      <select name="conversion_type" id="conversion_type" class="form-select" required>
+        <option value="">Choose…</option>
+        <option value="pdf_to_word">PDF → Word (.docx)</option>
+        <option value="pdf_to_jpg">PDF → JPG (all pages, ZIP)</option>
+        <option value="pdf_to_ipynb">PDF → Jupyter Notebook (.ipynb)</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Convert & Download</button>
+  </form>
+  <p class="mt-4 text-center">
+    <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+  </p>
+{% endblock %}

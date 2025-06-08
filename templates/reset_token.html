@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Set New Password{% endblock %}
+
+{% block content %}
+  <h2 class="mb-4 text-center">Set a New Password</h2>
+  <form action="{{ url_for('reset_token', token=request.view_args.token) }}" method="POST" onsubmit="return validateResetForm()">
+    <div class="mb-3">
+      <label for="password" class="form-label">New Password</label>
+      <input type="password" name="password" id="password" class="form-control" required autofocus />
+    </div>
+    <div class="mb-3">
+      <label for="confirm_password" class="form-label">Confirm New Password</label>
+      <input type="password" name="confirm_password" id="confirm_password" class="form-control" required />
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Reset Password</button>
+  </form>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+  <div class="text-center">
+    <h1 class="mb-4">Welcome to PDF Converter</h1>
+    <p>Please <a href="{{ url_for('login') }}">Log In</a> or <a href="{{ url_for('signup') }}">Sign Up</a> to use the converter.</p>
+  </div>
+{% endblock %}
