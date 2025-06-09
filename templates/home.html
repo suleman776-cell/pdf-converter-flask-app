@@ -1,9 +1,13 @@
-{% extends "base.html" %}
-{% block title %}Home{% endblock %}
-
+{% extends "layout.html" %}
 {% block content %}
-  <div class="text-center">
-    <h1 class="mb-4">Welcome to PDF Converter</h1>
-    <p>Please <a href="{{ url_for('login') }}">Log In</a> or <a href="{{ url_for('signup') }}">Sign Up</a> to use the converter.</p>
-  </div>
+<div class="container text-center">
+    <h1>Welcome to the PDF Converter</h1>
+    <p class="mt-3">Please log in or sign up to convert your PDF files to Word, JPG, or Jupyter Notebook formats.</p>
+    <div class="mt-3">
+        <a href="{{ url_for('login') }}" class="btn">Login</a>
+    </div>
+    <div class="mt-3">
+        <a href="{{ url_for('signup') }}" class="btn btn-secondary">Sign Up</a>
+    </div>
+</div>
 {% endblock %}

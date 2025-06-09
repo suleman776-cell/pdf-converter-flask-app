@@ -1,25 +1,23 @@
-{% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-
+{% extends "layout.html" %}
 {% block content %}
-  <h2 class="mb-4 text-center">Welcome, {{ username }}! Use the converter below:</h2>
-  <form method="POST" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" onsubmit="return validateForm()">
-    <div class="mb-3">
-      <label for="file" class="form-label">Select PDF File</label>
-      <input type="file" name="file" id="file" class="form-control" accept=".pdf" required />
-    </div>
-    <div class="mb-3">
-      <label for="conversion_type" class="form-label">Conversion Type</label>
-      <select name="conversion_type" id="conversion_type" class="form-select" required>
-        <option value="">Choose…</option>
-        <option value="pdf_to_word">PDF → Word (.docx)</option>
-        <option value="pdf_to_jpg">PDF → JPG (all pages, ZIP)</option>
-        <option value="pdf_to_ipynb">PDF → Jupyter Notebook (.ipynb)</option>
-      </select>
-    </div>
-    <button type="submit" class="btn btn-primary w-100">Convert & Download</button>
-  </form>
-  <p class="mt-4 text-center">
-    <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
-  </p>
+<div class="container container-wide">
+    <h2>Dashboard</h2>
+    <p>Welcome, {{ username }}! Upload a PDF file to convert it.</p>
+    <form method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="file" class="btn btn-secondary" id="file-upload-label">Choose PDF File</label>
+            <input type="file" name="file" id="file" accept=".pdf" required>
+            <div id="filename-display" class="mt-3"></div>
+        </div>
+        <div class="form-group">
+            <label for="conversion_type">Select Conversion Type</label>
+            <select name="conversion_type" id="conversion_type" class="form-group" required>
+                <option value="pdf_to_word">PDF to Word (.docx)</option>
+                <option value="pdf_to_jpg">PDF to Images (.zip of .jpgs)</option>
+                <option value="pdf_to_ipynb">PDF to Jupyter Notebook (.ipynb)</option>
+            </select>
+        </div>
+        <button type="submit" class="btn">Convert and Download</button>
+    </form>
+</div>
 {% endblock %}
